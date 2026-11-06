@@ -195,6 +195,28 @@ jobs:
         with:
           submodules: recursive
 
+      - name: FocoDesk - embutir servidor e chave
+        shell: bash
+        env:
+          FD_SERVER: ${{ secrets.RENDEZVOUS_SERVER }}
+          FD_KEY: ${{ secrets.RS_PUB_KEY }}
+        run: |
+          python3 - <<'EOF'
+          import os, re, pathlib
+          p = pathlib.Path("libs/hbb_common/src/config.rs")
+          s = p.read_text()
+          srv = os.environ["FD_SERVER"].strip()
+          key = os.environ["FD_KEY"].strip()
+          assert srv and key, "secrets vazios"
+          s, n1 = re.subn(r'pub const RENDEZVOUS_SERVERS: &\[&str\] = &\[[^\]]*\];',
+                          f'pub const RENDEZVOUS_SERVERS: &[&str] = &["{srv}"];', s)
+          s, n2 = re.subn(r'pub const RS_PUB_KEY: &str = "[^"]*";',
+                          f'pub const RS_PUB_KEY: &str = "{key}";', s)
+          assert n1 == 1 and n2 == 1, (n1, n2)
+          p.write_text(s)
+          EOF
+          grep -n "RENDEZVOUS_SERVERS: " libs/hbb_common/src/config.rs
+
       - name: Restore bridge files
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -611,6 +633,28 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           submodules: recursive
+
+      - name: FocoDesk - embutir servidor e chave
+        shell: bash
+        env:
+          FD_SERVER: ${{ secrets.RENDEZVOUS_SERVER }}
+          FD_KEY: ${{ secrets.RS_PUB_KEY }}
+        run: |
+          python3 - <<'EOF'
+          import os, re, pathlib
+          p = pathlib.Path("libs/hbb_common/src/config.rs")
+          s = p.read_text()
+          srv = os.environ["FD_SERVER"].strip()
+          key = os.environ["FD_KEY"].strip()
+          assert srv and key, "secrets vazios"
+          s, n1 = re.subn(r'pub const RENDEZVOUS_SERVERS: &\[&str\] = &\[[^\]]*\];',
+                          f'pub const RENDEZVOUS_SERVERS: &[&str] = &["{srv}"];', s)
+          s, n2 = re.subn(r'pub const RS_PUB_KEY: &str = "[^"]*";',
+                          f'pub const RS_PUB_KEY: &str = "{key}";', s)
+          assert n1 == 1 and n2 == 1, (n1, n2)
+          p.write_text(s)
+          EOF
+          grep -n "RENDEZVOUS_SERVERS: " libs/hbb_common/src/config.rs
 
       - name: Install LLVM and Clang
         uses: rustdesk-org/install-llvm-action-32bit@6aa7d9ad3df84dff01cd4596dd0fc880a7f47fce # no release tag; commit 2026-05-26
