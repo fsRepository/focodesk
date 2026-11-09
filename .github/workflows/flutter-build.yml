@@ -217,7 +217,7 @@ jobs:
           EOF
           grep -n "RENDEZVOUS_SERVERS: " libs/hbb_common/src/config.rs
 
-      - name: FocoDesk - marca, icones e bloqueio de atualizacao do RustDesk oficial
+      - name: FocoDesk - nome, marca, icones e bloqueio de atualizacao do RustDesk oficial
         shell: bash
         run: |
           # icones (arquivos em branding/ no repositorio)
@@ -225,6 +225,7 @@ jobs:
           cp branding/icon.ico res/icon.ico
           cp branding/tray-icon.ico res/tray-icon.ico
           cp branding/icon.png flutter/assets/icon.png
+          cp branding/icon.ico flutter/assets/icon.ico
           python3 - <<'EOF'
           import pathlib, re
 
@@ -268,6 +269,11 @@ jobs:
               assert t.count(old) == 1, old
               t = t.replace(old, new)
           ct.write_text(t, encoding="utf-8")
+
+          # 4) Nome do app (janela, bandeja, servico, pasta de instalacao e de configuracao)
+          sub1("libs/hbb_common/src/config.rs",
+               'pub static ref APP_NAME: RwLock<String> = RwLock::new("RustDesk".to_owned());',
+               'pub static ref APP_NAME: RwLock<String> = RwLock::new("FocoDesk".to_owned());')
           print("ok")
           EOF
 
@@ -710,7 +716,7 @@ jobs:
           EOF
           grep -n "RENDEZVOUS_SERVERS: " libs/hbb_common/src/config.rs
 
-      - name: FocoDesk - marca, icones e bloqueio de atualizacao do RustDesk oficial
+      - name: FocoDesk - nome, marca, icones e bloqueio de atualizacao do RustDesk oficial
         shell: bash
         run: |
           # icones (arquivos em branding/ no repositorio)
@@ -718,6 +724,7 @@ jobs:
           cp branding/icon.ico res/icon.ico
           cp branding/tray-icon.ico res/tray-icon.ico
           cp branding/icon.png flutter/assets/icon.png
+          cp branding/icon.ico flutter/assets/icon.ico
           python3 - <<'EOF'
           import pathlib, re
 
@@ -761,6 +768,11 @@ jobs:
               assert t.count(old) == 1, old
               t = t.replace(old, new)
           ct.write_text(t, encoding="utf-8")
+
+          # 4) Nome do app (janela, bandeja, servico, pasta de instalacao e de configuracao)
+          sub1("libs/hbb_common/src/config.rs",
+               'pub static ref APP_NAME: RwLock<String> = RwLock::new("RustDesk".to_owned());',
+               'pub static ref APP_NAME: RwLock<String> = RwLock::new("FocoDesk".to_owned());')
           print("ok")
           EOF
 
