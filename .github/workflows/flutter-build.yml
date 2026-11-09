@@ -217,6 +217,60 @@ jobs:
           EOF
           grep -n "RENDEZVOUS_SERVERS: " libs/hbb_common/src/config.rs
 
+      - name: FocoDesk - marca, icones e bloqueio de atualizacao do RustDesk oficial
+        shell: bash
+        run: |
+          # icones (arquivos em branding/ no repositorio)
+          cp branding/icon.ico flutter/windows/runner/resources/app_icon.ico
+          cp branding/icon.ico res/icon.ico
+          cp branding/tray-icon.ico res/tray-icon.ico
+          cp branding/icon.png flutter/assets/icon.png
+          python3 - <<'EOF'
+          import pathlib, re
+
+          def sub1(path, old, new):
+              p = pathlib.Path(path)
+              s = p.read_text(encoding="utf-8")
+              assert s.count(old) == 1, (path, old)
+              p.write_text(s.replace(old, new), encoding="utf-8")
+
+          # 1) Nao deixar o cliente consultar/baixar atualizacao do RustDesk oficial
+          sub1("src/updater.rs",
+               "    if !(manually || config::Config::get_bool_option(keys::OPTION_ALLOW_AUTO_UPDATE)) {",
+               "    if true || !(manually || config::Config::get_bool_option(keys::OPTION_ALLOW_AUTO_UPDATE)) {")
+          sub1("src/common.rs",
+               "pub fn check_software_update() {\n    if is_custom_client() {",
+               "pub fn check_software_update() {\n    if true || is_custom_client() {")
+
+          # 2) Identidade do executavel (Propriedades do arquivo, UAC, firewall)
+          rc = pathlib.Path("flutter/windows/runner/Runner.rc")
+          b = rc.read_bytes()
+          def setv(key, val):
+              global b
+              pat = re.compile(rb'(VALUE "' + key + rb'", )"[^"]*"')
+              assert len(pat.findall(b)) == 1, key
+              b = pat.sub(lambda m: m.group(1) + b'"' + val + b'"', b)
+          setv(b"CompanyName", b"Foco Sistemas")
+          setv(b"FileDescription", b"FocoDesk - Acesso Remoto")
+          setv(b"ProductName", b"FocoDesk")
+          setv(b"LegalCopyright", b"Copyright (C) Foco Sistemas. Baseado no RustDesk, Copyright (C) Purslane Tech Pte. Ltd. (AGPL-3.0)")
+          rc.write_bytes(b)
+
+          # 3) Metadados do exe de 32 bits (Sciter) vem do Cargo.toml
+          ct = pathlib.Path("Cargo.toml")
+          t = ct.read_text(encoding="utf-8")
+          assert t.count("[package.metadata.winres]\n") == 1
+          t = t.replace("[package.metadata.winres]\n", '[package.metadata.winres]\nCompanyName = "Foco Sistemas"\n')
+          t, n = re.subn(r'LegalCopyright = "[^"]*"', 'LegalCopyright = "Copyright (C) Foco Sistemas. Baseado no RustDesk, Copyright (C) Purslane Tech Pte. Ltd. (AGPL-3.0)"', t)
+          assert n == 1, n
+          for old, new in (('ProductName = "RustDesk"', 'ProductName = "FocoDesk"'),
+                           ('FileDescription = "RustDesk Remote Desktop"', 'FileDescription = "FocoDesk - Acesso Remoto"')):
+              assert t.count(old) == 1, old
+              t = t.replace(old, new)
+          ct.write_text(t, encoding="utf-8")
+          print("ok")
+          EOF
+
       - name: Restore bridge files
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -655,6 +709,60 @@ jobs:
           p.write_text(s)
           EOF
           grep -n "RENDEZVOUS_SERVERS: " libs/hbb_common/src/config.rs
+
+      - name: FocoDesk - marca, icones e bloqueio de atualizacao do RustDesk oficial
+        shell: bash
+        run: |
+          # icones (arquivos em branding/ no repositorio)
+          cp branding/icon.ico flutter/windows/runner/resources/app_icon.ico
+          cp branding/icon.ico res/icon.ico
+          cp branding/tray-icon.ico res/tray-icon.ico
+          cp branding/icon.png flutter/assets/icon.png
+          python3 - <<'EOF'
+          import pathlib, re
+
+          def sub1(path, old, new):
+              p = pathlib.Path(path)
+              s = p.read_text(encoding="utf-8")
+              assert s.count(old) == 1, (path, old)
+              p.write_text(s.replace(old, new), encoding="utf-8")
+
+          # 1) Nao deixar o cliente consultar/baixar atualizacao do RustDesk oficial
+          sub1("src/updater.rs",
+               "    if !(manually || config::Config::get_bool_option(keys::OPTION_ALLOW_AUTO_UPDATE)) {",
+               "    if true || !(manually || config::Config::get_bool_option(keys::OPTION_ALLOW_AUTO_UPDATE)) {")
+          sub1("src/common.rs",
+               "pub fn check_software_update() {\n    if is_custom_client() {",
+               "pub fn check_software_update() {\n    if true || is_custom_client() {")
+
+          # 2) Identidade do executavel (Propriedades do arquivo, UAC, firewall)
+          rc = pathlib.Path("flutter/windows/runner/Runner.rc")
+          b = rc.read_bytes()
+          def setv(key, val):
+              global b
+              pat = re.compile(rb'(VALUE "' + key + rb'", )"[^"]*"')
+              assert len(pat.findall(b)) == 1, key
+              b = pat.sub(lambda m: m.group(1) + b'"' + val + b'"', b)
+          setv(b"CompanyName", b"Foco Sistemas")
+          setv(b"FileDescription", b"FocoDesk - Acesso Remoto")
+          setv(b"ProductName", b"FocoDesk")
+          setv(b"LegalCopyright", b"Copyright (C) Foco Sistemas. Baseado no RustDesk, Copyright (C) Purslane Tech Pte. Ltd. (AGPL-3.0)")
+          rc.write_bytes(b)
+
+          # 3) Metadados do exe de 32 bits (Sciter) vem do Cargo.toml
+          ct = pathlib.Path("Cargo.toml")
+          t = ct.read_text(encoding="utf-8")
+          assert t.count("[package.metadata.winres]\n") == 1
+          t = t.replace("[package.metadata.winres]\n", '[package.metadata.winres]\nCompanyName = "Foco Sistemas"\n')
+          t, n = re.subn(r'LegalCopyright = "[^"]*"', 'LegalCopyright = "Copyright (C) Foco Sistemas. Baseado no RustDesk, Copyright (C) Purslane Tech Pte. Ltd. (AGPL-3.0)"', t)
+          assert n == 1, n
+          for old, new in (('ProductName = "RustDesk"', 'ProductName = "FocoDesk"'),
+                           ('FileDescription = "RustDesk Remote Desktop"', 'FileDescription = "FocoDesk - Acesso Remoto"')):
+              assert t.count(old) == 1, old
+              t = t.replace(old, new)
+          ct.write_text(t, encoding="utf-8")
+          print("ok")
+          EOF
 
       - name: Install LLVM and Clang
         uses: rustdesk-org/install-llvm-action-32bit@6aa7d9ad3df84dff01cd4596dd0fc880a7f47fce # no release tag; commit 2026-05-26
