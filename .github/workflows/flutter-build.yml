@@ -274,6 +274,9 @@ jobs:
           sub1("libs/hbb_common/src/config.rs",
                'pub static ref APP_NAME: RwLock<String> = RwLock::new("RustDesk".to_owned());',
                'pub static ref APP_NAME: RwLock<String> = RwLock::new("FocoDesk".to_owned());')
+          # 5) Rodape "Desenvolvido por RustDesk" -> credito de atribuicao (AGPL)
+          sub1("src/lang/pt_BR.rs", '("powered_by_me", "Desenvolvido por RustDesk"),', '("powered_by_me", "FocoDesk - Foco Sistemas (baseado no RustDesk)"),')
+          sub1("src/lang/en.rs", '("powered_by_me", "Powered by RustDesk"),', '("powered_by_me", "FocoDesk - Foco Sistemas (based on RustDesk)"),')
           print("ok")
           EOF
 
@@ -494,6 +497,21 @@ jobs:
         with:
           name: rustdesk-unsigned-windows-${{ matrix.job.arch }}
           path: rustdesk
+
+      - name: FocoDesk - copia com executavel renomeado
+        if: env.UPLOAD_ARTIFACT == 'true'
+        shell: bash
+        run: |
+          cp -r rustdesk focodesk-dist
+          mv focodesk-dist/rustdesk.exe focodesk-dist/FocoDesk.exe
+          ls focodesk-dist
+
+      - name: FocoDesk - upload
+        if: env.UPLOAD_ARTIFACT == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: focodesk-windows-${{ matrix.job.arch }}
+          path: focodesk-dist
 
       - name: Sign rustdesk files
         if: env.UPLOAD_ARTIFACT == 'true' && env.SIGN_BASE_URL != '-2'
@@ -773,6 +791,9 @@ jobs:
           sub1("libs/hbb_common/src/config.rs",
                'pub static ref APP_NAME: RwLock<String> = RwLock::new("RustDesk".to_owned());',
                'pub static ref APP_NAME: RwLock<String> = RwLock::new("FocoDesk".to_owned());')
+          # 5) Rodape "Desenvolvido por RustDesk" -> credito de atribuicao (AGPL)
+          sub1("src/lang/pt_BR.rs", '("powered_by_me", "Desenvolvido por RustDesk"),', '("powered_by_me", "FocoDesk - Foco Sistemas (baseado no RustDesk)"),')
+          sub1("src/lang/en.rs", '("powered_by_me", "Powered by RustDesk"),', '("powered_by_me", "FocoDesk - Foco Sistemas (based on RustDesk)"),')
           print("ok")
           EOF
 
