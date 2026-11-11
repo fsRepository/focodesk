@@ -1,0 +1,38 @@
+name: CI Lint (FocoDesk)
+
+# Guarda rapida (< 1 min) que roda em todo push/PR no master:
+#  - actionlint: valida a sintaxe de TODOS os workflows antes de gastar um build de ~1h
+#  - focodesk-verify: confere que as ancoras de embed/marca ainda casam com o codigo
+# Se qualquer uma falhar, o workflow Auto-rollback reverte o commit (ver auto-rollback.yml).
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  actionlint:
+    name: Validar workflows (actionlint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rodar actionlint
+        run: |
+          set -e
+          bash <(curl -sSf https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ./actionlint -color
+
+  focodesk-verify:
+    name: Verificar ancoras FocoDesk (embed + marca)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Rodar verificacao
+        run: python3 tools/focodesk_verify.py

@@ -1,0 +1,60 @@
+name: Auto-rollback
+
+# "Caso de errado, volta a versao anterior."
+#
+# Dispara QUANDO o workflow "CI Lint (FocoDesk)" termina em FALHA num push ao master.
+# Reverte automaticamente o commit que quebrou e empurra o revert.
+#
+# Por que amarrar no CI Lint e NAO no build completo (flutter-build/nightly):
+# o build roda uma matriz gigante (Windows, macOS, Android...) e as pernas de
+# macOS/Android falham com frequencia por falta de chave de assinatura -- isso
+# NAO significa que o commit quebrou algo. Reverter nesse caso reverteria
+# commits bons o tempo todo. O CI Lint e deterministico (actionlint + verify):
+# se ele falha, o commit realmente quebrou o workflow ou a marca -> reverter e seguro.
+#
+# Protecoes contra loop:
+#  - so age se o topo do master ainda for o commit que falhou (senao ja veio commit novo)
+#  - nao reverte se o topo ja for um "Revert"
+#  - o push usa GITHUB_TOKEN, que por padrao NAO dispara novos workflows (sem recursao)
+
+on:
+  workflow_run:
+    workflows: ["CI Lint (FocoDesk)"]
+    types: [completed]
+
+permissions:
+  contents: write
+
+jobs:
+  rollback:
+    if: >
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'master'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Reverter o commit que quebrou
+        env:
+          BAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -e
+          git config user.name "FocoDesk CI"
+          git config user.email "ci@focosistemas.com.br"
+          HEAD_SHA=$(git rev-parse HEAD)
+          if [ "$HEAD_SHA" != "$BAD_SHA" ]; then
+            echo "O master ja avancou ($HEAD_SHA != $BAD_SHA). Nao reverto automaticamente."
+            exit 0
+          fi
+          if git log -1 --pretty=%s | grep -q '^Revert '; then
+            echo "O topo do master ja e um revert. Nao faco nada (evita loop)."
+            exit 0
+          fi
+          echo "Revertendo commit $BAD_SHA que falhou no CI Lint..."
+          git revert --no-edit "$BAD_SHA"
+          git push origin master
+          echo "Revert empurrado. master voltou ao estado anterior."

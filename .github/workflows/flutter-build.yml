@@ -599,6 +599,38 @@ jobs:
           mv $msi.FullName ../../SignOutput/rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.msi
           sha256sum ../../SignOutput/rustdesk-*.msi
 
+      # FocoDesk: o executavel unico (self-extracting) e o MSI acima ja sao gerados
+      # em todo build, mas os passos de upload originais estao atras de flags de
+      # assinatura/publicacao que nao usamos. Aqui montamos e subimos os dois,
+      # renomeados, sem depender de assinatura. O exe unico ja embute a marca
+      # FocoDesk por dentro (janela, bandeja, servico, pasta). Instalacao e
+      # autostart: rodar o exe e clicar "Instalar", ou em lote:
+      #   FocoDesk-<arch>.exe --silent-install   (cria o servico, inicia com o Windows)
+      #   FocoDesk-<arch>.exe --password SENHA    (senha fixa p/ acesso nao supervisionado)
+      - name: FocoDesk - montar instaladores (exe unico + msi)
+        if: env.UPLOAD_ARTIFACT == 'true'
+        shell: bash
+        run: |
+          set -e
+          mkdir -p ./focodesk-installer
+          # exe unico: glob por arch (nao dependemos de VERSION, que fica vazio no nightly)
+          EXE=$(ls ./SignOutput/rustdesk-*-${{ matrix.job.arch }}.exe | head -1)
+          cp "$EXE" "./focodesk-installer/FocoDesk-${{ matrix.job.arch }}.exe"
+          # MSI p/ implantacao em massa (GPO). Observacao honesta: o nome exibido em
+          # "Adicionar/Remover Programas" ainda sai como RustDesk ate gerarmos o MSI
+          # branded (--app-name FocoDesk); o aplicativo em si ja e FocoDesk.
+          MSI=$(ls ./SignOutput/rustdesk-*-${{ matrix.job.arch }}.msi | head -1)
+          cp "$MSI" "./focodesk-installer/FocoDesk-${{ matrix.job.arch }}.msi"
+          ls -la ./focodesk-installer
+
+      - name: FocoDesk - upload instaladores
+        if: env.UPLOAD_ARTIFACT == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: focodesk-installer-${{ matrix.job.arch }}
+          path: ./focodesk-installer
+          if-no-files-found: error
+
       - name: Build pre-built MSI template
         # Two things this works around: preprocess.py rewrites res/msi in place, so the
         # tree is reset around this second variant; and it locates the app as
