@@ -69,6 +69,11 @@ count_regex("libs/hbb_common/src/config.rs",
 count_substr("libs/hbb_common/src/config.rs",
              'pub static ref APP_NAME: RwLock<String> = RwLock::new("RustDesk".to_owned());')
 
+# --- 2b) Ancora da preset password (passo "preset password") ---
+count_substr("libs/hbb_common/src/config.rs",
+             '        let storage = hard_settings.get("password").cloned().unwrap_or_default();\n'
+             '        let salt = hard_settings.get("salt").cloned().unwrap_or_default();')
+
 # --- 3) Bloqueio do auto-update do RustDesk oficial ---
 count_substr("src/updater.rs",
              "    if !(manually || config::Config::get_bool_option(keys::OPTION_ALLOW_AUTO_UPDATE)) {")
