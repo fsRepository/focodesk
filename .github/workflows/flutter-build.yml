@@ -217,41 +217,6 @@ jobs:
           EOF
           grep -n "RENDEZVOUS_SERVERS: " libs/hbb_common/src/config.rs
 
-      # Senha padrao gravada (preset password) para acesso nao supervisionado.
-      # O custom.txt oficial exige assinatura com a chave privada do RustDesk (Server Pro),
-      # que nao temos; entao injetamos o hash direto na unica funcao que le a preset password.
-      # A senha vem do secret FD_PRESET_PASSWORD (texto puro NUNCA entra no repositorio).
-      # Sem o secret, o passo e pulado e o cliente pede senha normalmente.
-      # ATENCAO: a senha e UNICA e compartilhada por todos os clientes -- quem tiver o exe
-      # e a senha conecta em qualquer maquina. OK no uso interno; para 14 parceiros externos,
-      # o caminho e o RustDesk Server Pro (conta por parceiro + auditoria).
-      - name: FocoDesk - preset password (senha padrao gravada)
-        shell: bash
-        env:
-          FD_PRESET_PASSWORD: ${{ secrets.FD_PRESET_PASSWORD }}
-        run: |
-          if [ -z "${FD_PRESET_PASSWORD}" ]; then
-            echo "FD_PRESET_PASSWORD nao definido -- pulando preset password."
-            exit 0
-          fi
-          python3 - <<'EOF'
-          import os, hashlib, base64, pathlib
-          pw = os.environ["FD_PRESET_PASSWORD"].strip()
-          salt = "fdkPresetSalt91x2"  # salt fixo do FocoDesk (nao e segredo)
-          h1 = hashlib.sha256(pw.encode() + salt.encode()).digest()[:32]
-          storage = "00" + base64.b64encode(h1).decode()
-          p = pathlib.Path("libs/hbb_common/src/config.rs")
-          s = p.read_text()
-          old = ('        let storage = hard_settings.get("password").cloned().unwrap_or_default();\n'
-                 '        let salt = hard_settings.get("salt").cloned().unwrap_or_default();')
-          new = ('        let storage = hard_settings.get("password").cloned().unwrap_or_else(|| "%s".to_owned());\n'
-                 '        let salt = hard_settings.get("salt").cloned().unwrap_or_else(|| "%s".to_owned());') % (storage, salt)
-          assert s.count(old) == 1, "ancora da preset password nao encontrada (merge do RustDesk mudou a funcao?)"
-          s = s.replace(old, new)
-          p.write_text(s)
-          print("preset password embutida (storage len=%d)." % len(storage))
-          EOF
-
       - name: FocoDesk - nome, marca, icones e bloqueio de atualizacao do RustDesk oficial
         shell: bash
         run: |
@@ -800,41 +765,6 @@ jobs:
           p.write_text(s)
           EOF
           grep -n "RENDEZVOUS_SERVERS: " libs/hbb_common/src/config.rs
-
-      # Senha padrao gravada (preset password) para acesso nao supervisionado.
-      # O custom.txt oficial exige assinatura com a chave privada do RustDesk (Server Pro),
-      # que nao temos; entao injetamos o hash direto na unica funcao que le a preset password.
-      # A senha vem do secret FD_PRESET_PASSWORD (texto puro NUNCA entra no repositorio).
-      # Sem o secret, o passo e pulado e o cliente pede senha normalmente.
-      # ATENCAO: a senha e UNICA e compartilhada por todos os clientes -- quem tiver o exe
-      # e a senha conecta em qualquer maquina. OK no uso interno; para 14 parceiros externos,
-      # o caminho e o RustDesk Server Pro (conta por parceiro + auditoria).
-      - name: FocoDesk - preset password (senha padrao gravada)
-        shell: bash
-        env:
-          FD_PRESET_PASSWORD: ${{ secrets.FD_PRESET_PASSWORD }}
-        run: |
-          if [ -z "${FD_PRESET_PASSWORD}" ]; then
-            echo "FD_PRESET_PASSWORD nao definido -- pulando preset password."
-            exit 0
-          fi
-          python3 - <<'EOF'
-          import os, hashlib, base64, pathlib
-          pw = os.environ["FD_PRESET_PASSWORD"].strip()
-          salt = "fdkPresetSalt91x2"  # salt fixo do FocoDesk (nao e segredo)
-          h1 = hashlib.sha256(pw.encode() + salt.encode()).digest()[:32]
-          storage = "00" + base64.b64encode(h1).decode()
-          p = pathlib.Path("libs/hbb_common/src/config.rs")
-          s = p.read_text()
-          old = ('        let storage = hard_settings.get("password").cloned().unwrap_or_default();\n'
-                 '        let salt = hard_settings.get("salt").cloned().unwrap_or_default();')
-          new = ('        let storage = hard_settings.get("password").cloned().unwrap_or_else(|| "%s".to_owned());\n'
-                 '        let salt = hard_settings.get("salt").cloned().unwrap_or_else(|| "%s".to_owned());') % (storage, salt)
-          assert s.count(old) == 1, "ancora da preset password nao encontrada (merge do RustDesk mudou a funcao?)"
-          s = s.replace(old, new)
-          p.write_text(s)
-          print("preset password embutida (storage len=%d)." % len(storage))
-          EOF
 
       - name: FocoDesk - nome, marca, icones e bloqueio de atualizacao do RustDesk oficial
         shell: bash
