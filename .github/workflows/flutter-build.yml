@@ -277,6 +277,13 @@ jobs:
           # 5) Rodape "Desenvolvido por RustDesk" -> credito de atribuicao (AGPL)
           sub1("src/lang/pt_BR.rs", '("powered_by_me", "Desenvolvido por RustDesk"),', '("powered_by_me", "FocoDesk - Foco Sistemas (baseado no RustDesk)"),')
           sub1("src/lang/en.rs", '("powered_by_me", "Powered by RustDesk"),', '("powered_by_me", "FocoDesk - Foco Sistemas (based on RustDesk)"),')
+          # 6) Desativar descoberta de rede local (aba "Descoberto"): nao anuncia nem lista maquinas da LAN
+          sub1("src/lan.rs",
+               "pub async fn discover() -> ResultType<()> {\n    let sockets = send_query()?;",
+               "pub async fn discover() -> ResultType<()> {\n    if true {\n        return Ok(());\n    }\n    let sockets = send_query()?;")
+          sub1("src/lan.rs",
+               '                        if p.cmd == "ping"\n                            && config::option2bool(',
+               '                        if false && p.cmd == "ping"\n                            && config::option2bool(')
           print("ok")
           EOF
 
@@ -513,6 +520,30 @@ jobs:
           name: focodesk-windows-${{ matrix.job.arch }}
           path: focodesk-dist
 
+      - name: FocoDesk - instalador unico (NSIS)
+        if: env.UPLOAD_ARTIFACT == 'true' && matrix.job.arch == 'x86_64'
+        shell: pwsh
+        env:
+          FD_DEPLOY_TOKEN: ${{ secrets.FOCODESK_DEPLOY_TOKEN }}
+        run: |
+          if (-not $env:FD_DEPLOY_TOKEN) { throw "secret FOCODESK_DEPLOY_TOKEN vazio" }
+          choco install nsis -y --no-progress
+          $nsis = Join-Path ${env:ProgramFiles(x86)} "NSIS\makensis.exe"
+          if (-not (Test-Path $nsis)) { throw "makensis nao encontrado em $nsis" }
+          $root = (Get-Location).Path
+          Copy-Item installer\deploy-focodesk.ps1 focodesk-dist\ -Force
+          New-Item -ItemType Directory -Force -Path focodesk-installer | Out-Null
+          & $nsis /V2 "/DDEPLOY_TOKEN=$env:FD_DEPLOY_TOKEN" "/DDIST_DIR=$root\focodesk-dist" "/DICON=$root\branding\icon.ico" "/DOUTFILE=$root\focodesk-installer\FocoDesk-Setup.exe" installer\FocoDesk-Setup.nsi
+          if ($LASTEXITCODE -ne 0) { throw "makensis falhou ($LASTEXITCODE)" }
+          Get-ChildItem focodesk-installer
+
+      - name: FocoDesk - upload do instalador
+        if: env.UPLOAD_ARTIFACT == 'true' && matrix.job.arch == 'x86_64'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: focodesk-setup-windows-${{ matrix.job.arch }}
+          path: focodesk-installer/FocoDesk-Setup.exe
+
       - name: Sign rustdesk files
         if: env.UPLOAD_ARTIFACT == 'true' && env.SIGN_BASE_URL != '-2'
         shell: bash
@@ -598,38 +629,6 @@ jobs:
           $msi = Get-ChildItem ./Package/bin/*/Release/en-us/Package.msi | Select-Object -First 1
           mv $msi.FullName ../../SignOutput/rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.msi
           sha256sum ../../SignOutput/rustdesk-*.msi
-
-      # FocoDesk: o executavel unico (self-extracting) e o MSI acima ja sao gerados
-      # em todo build, mas os passos de upload originais estao atras de flags de
-      # assinatura/publicacao que nao usamos. Aqui montamos e subimos os dois,
-      # renomeados, sem depender de assinatura. O exe unico ja embute a marca
-      # FocoDesk por dentro (janela, bandeja, servico, pasta). Instalacao e
-      # autostart: rodar o exe e clicar "Instalar", ou em lote:
-      #   FocoDesk-<arch>.exe --silent-install   (cria o servico, inicia com o Windows)
-      #   FocoDesk-<arch>.exe --password SENHA    (senha fixa p/ acesso nao supervisionado)
-      - name: FocoDesk - montar instaladores (exe unico + msi)
-        if: env.UPLOAD_ARTIFACT == 'true'
-        shell: bash
-        run: |
-          set -e
-          mkdir -p ./focodesk-installer
-          # exe unico: glob por arch (nao dependemos de VERSION, que fica vazio no nightly)
-          EXE=$(ls ./SignOutput/rustdesk-*-${{ matrix.job.arch }}.exe | head -1)
-          cp "$EXE" "./focodesk-installer/FocoDesk-${{ matrix.job.arch }}.exe"
-          # MSI p/ implantacao em massa (GPO). Observacao honesta: o nome exibido em
-          # "Adicionar/Remover Programas" ainda sai como RustDesk ate gerarmos o MSI
-          # branded (--app-name FocoDesk); o aplicativo em si ja e FocoDesk.
-          MSI=$(ls ./SignOutput/rustdesk-*-${{ matrix.job.arch }}.msi | head -1)
-          cp "$MSI" "./focodesk-installer/FocoDesk-${{ matrix.job.arch }}.msi"
-          ls -la ./focodesk-installer
-
-      - name: FocoDesk - upload instaladores
-        if: env.UPLOAD_ARTIFACT == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: focodesk-installer-${{ matrix.job.arch }}
-          path: ./focodesk-installer
-          if-no-files-found: error
 
       - name: Build pre-built MSI template
         # Two things this works around: preprocess.py rewrites res/msi in place, so the
@@ -826,6 +825,13 @@ jobs:
           # 5) Rodape "Desenvolvido por RustDesk" -> credito de atribuicao (AGPL)
           sub1("src/lang/pt_BR.rs", '("powered_by_me", "Desenvolvido por RustDesk"),', '("powered_by_me", "FocoDesk - Foco Sistemas (baseado no RustDesk)"),')
           sub1("src/lang/en.rs", '("powered_by_me", "Powered by RustDesk"),', '("powered_by_me", "FocoDesk - Foco Sistemas (based on RustDesk)"),')
+          # 6) Desativar descoberta de rede local (aba "Descoberto"): nao anuncia nem lista maquinas da LAN
+          sub1("src/lan.rs",
+               "pub async fn discover() -> ResultType<()> {\n    let sockets = send_query()?;",
+               "pub async fn discover() -> ResultType<()> {\n    if true {\n        return Ok(());\n    }\n    let sockets = send_query()?;")
+          sub1("src/lan.rs",
+               '                        if p.cmd == "ping"\n                            && config::option2bool(',
+               '                        if false && p.cmd == "ping"\n                            && config::option2bool(')
           print("ok")
           EOF
 
