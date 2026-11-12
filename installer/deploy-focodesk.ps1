@@ -107,7 +107,9 @@ $Installed = Join-Path $PF "FocoDesk\FocoDesk.exe"
 $svc = Get-Service -Name "FocoDesk" -ErrorAction SilentlyContinue
 if ((-not $svc) -or (-not (Test-Path $Installed))) {
   Log "Instalando (servico + inicia com o Windows)..."
-  & $Src --silent-install | Out-Null
+  # NAO usar "& exe | Out-Null": o FocoDesk deixa processos filhos vivos que herdam o pipe e o
+  # PowerShell ficaria esperando para sempre. Start-Process nao herda o pipe; esperamos pelo servico.
+  Start-Process -FilePath $Src -ArgumentList "--silent-install" -WindowStyle Hidden | Out-Null
 } else {
   Log "FocoDesk ja instalado; pulando a instalacao."
 }
@@ -124,6 +126,7 @@ if (-not $ok) {
   Log "ERRO: o servico FocoDesk nao ficou em execucao (ou $Installed nao existe)."
   exit 1
 }
+Start-Sleep -Seconds 5   # deixa o instalador terminar atalhos e registro antes de definir a senha
 
 # ---------- 2) senha aleatoria ----------
 function New-RandomPassword([int]$Length = 24) {
