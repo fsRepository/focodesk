@@ -194,6 +194,31 @@ for ($try = 1; $try -le 5; $try++) {
       -Headers @{ Authorization = "Bearer $DeployToken" } `
       -ContentType "application/json; charset=utf-8" -Body $Bytes | Out-Null
     Log "OK: maquina registrada na Foco. ID=$Id Hostname=$($env:COMPUTERNAME) CNPJ=$CnpjN"
+    # ---------- 7) heartbeat: status online/offline (Scheduled Task a cada 2 min) ----------
+    try {
+      $HbUrl = $ApiUrl -replace '/register/?$', '/heartbeat'
+      $HbScript = Join-Path $DataDir "heartbeat.ps1"
+      $hb = @"
+`$ErrorActionPreference='SilentlyContinue'
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
+`$sf='$SecretFile'
+`$exe='$Installed'
+`$url='$HbUrl'
+if(!(Test-Path `$sf) -or !(Test-Path `$exe)){exit 0}
+`$secret=(Get-Content -Raw `$sf).Trim()
+`$out=(& `$exe --get-id | Out-String)
+if(`$out -notmatch '(\d{6,12})'){exit 0}
+`$body=@{id=`$Matches[1];device_secret=`$secret}|ConvertTo-Json -Compress
+try{Invoke-RestMethod -Uri `$url -Method Post -ContentType 'application/json' -Body `$body -TimeoutSec 20|Out-Null}catch{}
+"@
+      Set-Content -Path $HbScript -Value $hb -Encoding UTF8
+      # schtasks.exe: roda a cada 2 min como SYSTEM, indefinidamente (mais confiavel que o cmdlet)
+      $tr = 'powershell -NonInteractive -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + $HbScript + '"'
+      & schtasks.exe /Create /TN "FocoDesk Heartbeat" /TR $tr /SC MINUTE /MO 2 /RU SYSTEM /RL HIGHEST /F | Out-Null
+      Log "Heartbeat configurado (online/offline a cada 2 min)."
+    } catch {
+      Log "AVISO: registro OK, mas nao consegui configurar o heartbeat (status online)."
+    }
     $Senha = $null
     exit 0
   } catch {
