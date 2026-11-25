@@ -11,10 +11,12 @@
 #
 #  Como usar (PowerShell como ADMINISTRADOR), na pasta extraida do artifact
 #  "focodesk-windows-..." (onde esta o FocoDesk.exe e as DLLs):
-#     powershell -ExecutionPolicy Bypass -File .\deploy-focodesk.ps1 -Cnpj "11.222.333/0001-81" -ClientRef "Loja Centro"
+#     powershell -ExecutionPolicy Bypass -File .\deploy-focodesk.ps1 -Doc "11.222.333/0001-81" -Alias "Caixa01" -ClientRef "Loja Centro"
 #
-#  -Cnpj       obrigatorio: CNPJ do cliente (com ou sem mascara). E o vinculo com o sistema de gestao.
-#              Use o CNPJ da unidade onde a maquina esta (filial = CNPJ da filial).
+#  -Doc        obrigatorio: CPF ou CNPJ do cliente (com ou sem mascara). E o vinculo com o sistema de gestao.
+#              Use o CNPJ da unidade onde a maquina esta (filial = CNPJ da filial). -Cnpj continua valendo.
+#  -Alias      opcional: nome desta maquina (ex.: Servidor, Caixa01), ate 40 caracteres. Em branco, a API
+#              usa o nome do computador (e, numa reinstalacao, mantem o alias ja cadastrado).
 #  -ClientRef  opcional: nome livre so para exibicao (ex.: "Loja Centro").
 #
 #  Codigos de saida: 0 ok | 1 falha na instalacao/ID/senha | 2 falha ao registrar na API
@@ -24,15 +26,19 @@
 #  (o instalador do RustDesk nao renomeia o executavel na instalacao).
 # ============================================================
 param(
-  [string]$Cnpj = "",
+  [Alias("Cnpj")]
+  [string]$Doc = "",
+  [string]$Alias = "",
   [string]$ClientRef = "",
   [string]$DeployToken = "",
   [switch]$ValidateOnly
 )
 
-# CNPJ e token tambem podem vir por variavel de ambiente (usado pelo instalador FocoDesk-Setup.exe,
-# assim nada fica na linha de comando nem escrito dentro deste arquivo).
-if (-not $Cnpj)        { $Cnpj        = $env:FOCODESK_CNPJ }
+# Documento, alias e token tambem podem vir por variavel de ambiente (usado pelo instalador
+# FocoDesk-Setup.exe, assim nada fica na linha de comando nem escrito dentro deste arquivo).
+if (-not $Doc)         { $Doc         = $env:FOCODESK_DOC }
+if (-not $Doc)         { $Doc         = $env:FOCODESK_CNPJ }
+if (-not $Alias)       { $Alias       = $env:FOCODESK_ALIAS }
 if (-not $DeployToken) { $DeployToken = $env:FOCODESK_DEPLOY_TOKEN }
 
 # --- CONFIG (ajuste) ---
@@ -72,11 +78,42 @@ function ConvertTo-Cnpj([string]$v) {
   $dvs = "$d1$d2"
   if ($c.EndsWith($dvs)) { return $c } else { return $null }
 }
-$CnpjN = ConvertTo-Cnpj $Cnpj
-if (-not $CnpjN) {
-  Write-Host "[FocoDesk] ERRO: informe um CNPJ valido com -Cnpj (ex.: -Cnpj ""11.222.333/0001-81"")."
+function ConvertTo-Cpf([string]$v) {
+  $c = ($v -replace '[^0-9A-Za-z]', '')
+  if ($c -notmatch '^[0-9]{11}$') { return $null }
+  if ($c -match '^(\d)\1{10}$') { return $null }
+  foreach ($len in 9, 10) {
+    $sum = 0
+    for ($i = 0; $i -lt $len; $i++) { $sum += ([int][char]$c[$i] - 48) * ($len + 1 - $i) }
+    $r = ($sum * 10) % 11
+    if ($r -eq 10) { $r = 0 }
+    if ($r -ne ([int][char]$c[$len] - 48)) { return $null }
+  }
+  return $c
+}
+# CPF (11 digitos) ou CNPJ (14 caracteres): devolve o documento normalizado ou $null
+function ConvertTo-Documento([string]$v) {
+  $d = ConvertTo-Cpf $v
+  if ($d) { return $d }
+  return (ConvertTo-Cnpj $v)
+}
+# alias da maquina: sem caracteres de controle, sem espacos nas pontas, ate 40 caracteres ("" = nao informado)
+function ConvertTo-Alias([string]$v) {
+  if (-not $v) { return "" }
+  $a = ($v -replace '[\x00-\x1F\x7F]', '').Trim()
+  if ($a.Length -gt 40) {
+    $a = $a.Substring(0, 40)
+    if ([char]::IsHighSurrogate($a[$a.Length - 1])) { $a = $a.Substring(0, $a.Length - 1) }
+    $a = $a.TrimEnd()
+  }
+  return $a
+}
+$DocN = ConvertTo-Documento $Doc
+if (-not $DocN) {
+  Write-Host "[FocoDesk] ERRO: informe um CPF ou CNPJ valido com -Doc (ex.: -Doc ""11.222.333/0001-81"")."
   exit 1
 }
+$AliasN = ConvertTo-Alias $Alias
 
 if ($ValidateOnly) { exit 0 }
 
@@ -180,10 +217,11 @@ $Body = @{
   id            = $Id
   password      = $Senha
   hostname      = $env:COMPUTERNAME
-  cnpj          = $CnpjN
+  cnpj          = $DocN
   device_secret = $DeviceSecret
 }
 if ($ClientRef) { $Body["client_ref"] = $ClientRef }
+if ($AliasN)    { $Body["alias"] = $AliasN }
 $Json = $Body | ConvertTo-Json -Compress
 $Bytes = [System.Text.Encoding]::UTF8.GetBytes($Json)
 
@@ -193,7 +231,7 @@ for ($try = 1; $try -le 5; $try++) {
     Invoke-RestMethod -Uri $ApiUrl -Method Post `
       -Headers @{ Authorization = "Bearer $DeployToken" } `
       -ContentType "application/json; charset=utf-8" -Body $Bytes | Out-Null
-    Log "OK: maquina registrada na Foco. ID=$Id Hostname=$($env:COMPUTERNAME) CNPJ=$CnpjN"
+    Log "OK: maquina registrada na Foco. ID=$Id Hostname=$($env:COMPUTERNAME) Alias=$(if ($AliasN) { $AliasN } else { "(nome do computador)" }) Doc=$DocN"
     # ---------- 7) heartbeat: status online/offline (Scheduled Task a cada 2 min) ----------
     try {
       $HbUrl = $ApiUrl -replace '/register/?$', '/heartbeat'
