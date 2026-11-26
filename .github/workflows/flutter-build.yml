@@ -174,16 +174,16 @@ jobs:
               vcpkg-triplet: x64-windows-static,
               build-args: "--vram",
             }
-          - {
-              target: aarch64-pc-windows-msvc,
-              os: windows-11-arm,
-              arch: aarch64,
-              flutter-arch: arm64,
-              vcpkg-triplet: arm64-windows-static,
-              # vram is x86/x64-only (NVENC needs CUDA, Intel MediaSDK needs __rdtsc);
-              # no NV/Intel/AMD hardware exists on Windows-on-ARM, so vram stays disabled here.
-              build-args: "",
-            }
+          # FocoDesk: Windows ARM (aarch64) desativado — nosso parque e x86_64 (PDVs/PCs).
+          # Para reativar, descomente este bloco. Ver docs/BUILD-FOCODESK.md
+          # - {
+          #     target: aarch64-pc-windows-msvc,
+          #     os: windows-11-arm,
+          #     arch: aarch64,
+          #     flutter-arch: arm64,
+          #     vcpkg-triplet: arm64-windows-static,
+          #     build-args: "",
+          #   }
     steps:
       - name: Export GitHub Actions cache environment variables
         uses: actions/github-script@d7906e4ad0b1822421a7e6a35d5ca353c962f410 # v6
@@ -717,8 +717,9 @@ jobs:
     name: ${{ matrix.job.target }} (${{ matrix.job.os }})
     needs: [validate-update-metadata-keys]
     runs-on: ${{ matrix.job.os }}
-    # Temporarily disable this action due to additional test is needed.
-    # if: false
+    # FocoDesk: UI Sciter (legada) desativada — usamos so o cliente Flutter.
+    # O instalador FocoDesk sai do job build-for-windows-flutter. Ver docs/BUILD-FOCODESK.md
+    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -1631,6 +1632,8 @@ jobs:
   build-rustdesk-android:
     needs: [generate-bridge]
     name: build rustdesk android apk ${{ matrix.job.target }}
+    # FocoDesk: Android desativado por ora (hoje so Windows). Ver docs/BUILD-FOCODESK.md
+    if: false
     runs-on: ${{ matrix.job.os }}
     strategy:
       fail-fast: false
@@ -1924,7 +1927,8 @@ jobs:
   build-rustdesk-android-universal:
     needs: [build-rustdesk-android]
     name: build rustdesk android universal apk
-    if: ${{ inputs.upload-artifact }}
+    # FocoDesk: Android desativado por ora (hoje so Windows). Ver docs/BUILD-FOCODESK.md
+    if: false
     runs-on: ubuntu-24.04
     env:
       reltype: release
